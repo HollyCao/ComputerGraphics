@@ -1,0 +1,461 @@
+<script src=lib9.js></script>
+
+<body bgcolor=lightyellow text=black style = "font-family:'Comic Sans MS', cursive, sans-serif" link=white alink=white vlink=white>
+<center>
+<canvas id = 'background-canvas' style="position: absolute; left: 50%; top: 30%; z-index: 0;"></canvas>
+
+<!-- <img src = "candy_jar.png" width = 400 height = 400 style="position: absolute; left: 50%; top: 50%; z-index: 0;"> -->
+<canvas id='canvas1' width=400 height=400 style="position: absolute;  left: 50%; top: 30%; z-index: 1;"></canvas>
+</center>
+
+<br>
+
+<div style = "position: absolute; top: 30%">
+  Spin your candy around
+  <input type=range min=1 max=100 value=50 class=slider id=rotateViewSlider>
+  <p>
+  <table><tr><td>Candy type:<td><div id=shapeButtons></div></table>
+  <table><tr><td>Candy flavor:<td><div id=colorButtons></div></table>
+</br>
+  <table>
+    Adjust shapes of selected candies:
+    <tr>
+  <td>Rotate
+  <br>X <input type=range min=1 max=100 value=50 class=slider id=rotateXSlider>
+  <br>Y <input type=range min=1 max=100 value=50 class=slider id=rotateYSlider>
+  <br>Z <input type=range min=1 max=100 value=50 class=slider id=rotateZSlider>
+
+  <td width=20>
+
+  <td>Scale
+  <br>X <input type=range min=1 max=100 value=50 class=slider id=scaleXSlider>
+  <br>Y <input type=range min=1 max=100 value=50 class=slider id=scaleYSlider>
+  <br>Z <input type=range min=1 max=100 value=50 class=slider id=scaleZSlider>
+
+  </table>
+
+  <p>
+  <button onClick=deleteSelectedObject()><b>TAKE THIS CANDY AWAY I'M CHUBBY</b></button>
+
+</div>
+
+</body>
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   attribute vec3 aNor;
+   attribute vec2 aUV;
+   uniform   mat4 uPMat;
+   uniform   mat4 uMatF;
+   uniform   mat4 uMatI;
+   varying   vec3 vaPos;
+   varying   vec3 vPos;
+   varying   vec3 vNor;
+   varying   vec2 vUV;
+   void main() {
+      vec4 pos = uPMat * uMatF * vec4(aPos, 1.);
+      vec4 nor = vec4(aNor, 0.) * uMatI;
+      gl_Position = pos * vec4(1.,1.,1./10.,1.);
+      vaPos = aPos;
+      vPos = pos.xyz;
+      vNor = nor.xyz;
+      vUV  = aUV;
+   }
+</script>
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ const int nl = 3;            // NUMBER OF LIGHTS
+ uniform vec3  uLDir[nl];     // LIGHT DIRECTIONS
+ uniform vec3  uLCol[nl];     // LIGHT COLORS
+ uniform mat4  uM;            // MATERIAL PROPERTIES
+ uniform float uTime;         // TIME (CURRENTLY UNUSED)
+ varying vec3  vPos;
+ varying vec3  vaPos;
+ varying vec3  vNor;
+ varying vec2  vUV;
+
+ void main() {
+    vec3 P = vPos;            // SURFACE POINT
+    vec3 N = normalize(vNor); // SURFACE NORMAL
+    vec3 E = vec3(0.,0.,1.);  // APPROX DIRECTION TO EYE
+
+    // UNPACK MATERIAL PROPERTIES MATRIX
+
+    mat4 material = uM;
+    vec3 ambient  = material[0].rgb;
+    vec3 diffuse  = material[1].rgb;
+    vec3 specular = material[2].rgb;
+    float p       = material[2].a;
+    float ta      = material[3].r;
+    float tf      = material[3].g;
+
+    // DO PHONG SHADING
+
+    vec3 color = ambient;
+    for (int i = 0 ; i < nl ; i++) {
+       vec3 R = 2. * dot(uLDir[i], N) * N - uLDir[i];
+       float d = max(0., dot(uLDir[i], N));
+       float s = pow(max(0., dot(E, R)), p);
+       color += uLCol[i] * (diffuse * d + specular * s);
+    }
+    color += specular * .02 * (.1 + noise(2. * N)) * N.z;
+    if (ta != 0.)
+       color *= 1. + ta * noise(vec3(tf * vUV, 0.));
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+<!!-------- A PROPERLY DESCRIPTIVE TITLE -------->
+
+<script id='my_title' type='text/html'>
+CANDYLAND
+</script>
+
+<!!-------- A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+Reward yourself to get through the midlife crisis by adding candies in your jar. Don't forget to shape the candy to your desired look
+</script>
+
+<script>
+
+
+
+let mint          = phong([0,.4,.8], [0,.25,.5], [1,1,1], 20);
+let brass                 = phong([.02,.012,0], [.02,.012,0], [1,.6,0], 10);
+let gold                  = phong([.1,.03,0], [.12,.05,0], [1,.5,0], 10);
+let apple         = phong([0,.8,0], [0,.5,0], [1,1,1], 20);
+let chilli   = phong([.1,0,0], [.5,0,0], [1,1,1], 50, 5, 10);
+let cherry          = phong([.9,0,0], [.5,0,0], [1,1,1], 20);
+let steel                 = phong([.02,.02,.02], [.02,.02,.02], [1,1,1], 10);
+let white_gold            = phong([.01,.01,.008], [0,0,0], [2,2,1.6], 40);
+let white_mottled_plastic = phong([.1,.1,.1], [.5,.5,.5], [1,1,1], 20, 1, 20);
+let white_plastic         = phong([.1,.1,.1], [.5,.5,.5], [1,1,1], 20);
+let popcorn   = phong([.8,.8,0], [1,0,0], [1,1,1], 50, 5, 10)
+
+
+let colors = 'red,lightgreen,lightblue, darkred,goldenrod'.split(',');
+let flavors = 'cherry, apple, mint, chilli, popcorn'.split(',');
+let materials = [ cherry, apple, mint,chilli, popcorn];
+let selectedColor = 0;
+
+// BUILD ALL OF THE COLOR BUTTONS.
+
+(() => {
+   let s = '';
+   for (let n = 0 ; n < colors.length ; n++) {
+      s += '<input type=button '
+         + 'id=colorButton' + n + ' '
+         + 'value= ' + flavors[n] + ' '
+	 + 'style=\'background-color:' + colors[n] + '; color: white \''
+	 + 'onClick = selectColor(' + n + ')'
+         + '>\n';
+   }
+   colorButtons.innerHTML = s;
+   console.log(s);
+})();
+
+let selectColor = n => {
+   selectedColor = n;
+   for (let i = 0 ; i < colors.length ; i++) {
+      let button = window['colorButton' + i];
+      button.style.height = i == n ? 30 : 20;
+   }
+}
+
+selectColor(0);
+
+
+let martiniGlass = createTriangleMesh(uvToLathe, 30, 30,
+   [
+      [1,.05, .05,.075,.5, .5,0], // r
+      [-1,-.7, 0,.85,.92, 1,1]     // z
+   ]
+);
+
+
+
+let shapeNames = 'mentos,ice-breaker, hershies, candylab, mini-martini'.split(',');
+let shapes = [ sphere, cube ,cone, cylinder, martiniGlass];
+let selectedShape = 0;
+
+// BUILD ALL OF THE SHAPE BUTTONS.
+
+(() => {
+   let s = '';
+   for (let n = 0 ; n < shapeNames.length ; n++) {
+      let name = shapeNames[n];
+      s += '<button '
+         + 'id=shapeButton' + n + ' '
+	 + 'style=\'border-syle:none\''
+	 + 'onClick=selectShape(' + n + ')>'
+	 + '<b>' + name + '</b>'
+         + '</button> '
+   }
+   shapeButtons.innerHTML = s;
+})();
+
+let selectShape = n => {
+   selectedShape = n;
+   for (let n = 0 ; n < shapeNames.length ; n++) {
+      let button = document.getElementById('shapeButton' + n);
+      let bgColor = n == selectedShape ? 'white' : 'gray';
+      button.style.backgroundColor = bgColor;
+   }
+}
+
+selectShape(0);
+
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+
+/********************************************************************************
+WE ARE COMMENTING THIS OUT SO THAT THE FRAGMENT SHADER EDITOR DOES NOT APPEAR.
+   
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+********************************************************************************/
+
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+
+/********************************************************************************
+WE ALSO COMMENT THIS OUT, AS PART OF COMMENTING OUT THE FRAGMENT SHADER EDITOR.
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+********************************************************************************/
+
+
+// USEFUL ANIMATION VARIABLES.
+
+let startTime = Date.now(), prevTime = startTime, rate = 1, theta = 0;
+
+
+// DELETE THE SELECTED OBJECT.
+
+let deleteSelectedObject = () => {
+   if (selectedObject)
+      selectedObject.delete();
+}
+
+
+// THIS METHOD GETS CALLED WHENEVER THE USER ADJUSTS THE VIEW ROTATION SLIDER.
+
+rotateViewSlider.oninput = function() {
+   theta = Math.PI * (.5 - this.value / 50);
+}
+
+
+// RESPONSE TO USER ADJUSTING SLIDER VALUES FOR ROTATING THE SELECTED OBJECT.
+
+rotateXSlider.oninput = function() { rotateAboutAxis(0, this.value / 50 - 1); }
+rotateYSlider.oninput = function() { rotateAboutAxis(1, this.value / 50 - 1); }
+rotateZSlider.oninput = function() { rotateAboutAxis(2, this.value / 50 - 1); }
+
+let rotateAboutAxis = (axis, value) => {
+   if (selectedObject) {
+      selectedObject.rotate[axis] = value;
+      transformObject(selectedObject);
+   }
+}
+
+
+// RESPONSE TO USER ADJUSTING SLIDER VALUES FOR SCALING THE SELECTED OBJECT.
+
+scaleXSlider.oninput = function() { scaleAboutAxis(0, this.value / 50); }
+scaleYSlider.oninput = function() { scaleAboutAxis(1, this.value / 50); }
+scaleZSlider.oninput = function() { scaleAboutAxis(2, this.value / 50); }
+
+let scaleAboutAxis = (axis, value) => {
+   if (selectedObject) {
+      selectedObject.scale[axis] = value;
+      transformObject(selectedObject);
+   }
+}
+
+
+// DEFINE ANIMATION CALLBACK, WHICH WILL GET CALLED AT EVERY FRAME.
+
+let time = 0;
+
+let viewMatrix = new Matrix();
+let inverseViewMatrix = new Matrix();
+
+function animate() {
+
+   // VARY THE ROTATION RATE DEPENDING ON THE SLIDER VALUE.
+
+   time = (Date.now() - startTime) / 1000;
+
+   // SET TIME IN THE GPU.
+
+   setUniform('1f', 'uTime', time);
+
+   // SET LIGHTS IN THE GPU.
+
+   setUniform('3fv', 'uLDir', [ .57,.57,.57, -.57,-.57,-.57, -.8,-.6,0 ]);
+   setUniform('3fv', 'uLCol', [ 1,1,1,        .25,.2,.15,     .2,.18,.16 ]);
+
+   // DRAW EVERYTHING.
+
+   viewMatrix.identity().rotateY(theta);
+
+   inverseViewMatrix.setValue(viewMatrix.getValue());
+   inverseViewMatrix.invert();
+
+   scene.identity().multiply(viewMatrix);
+
+
+   // SET THE BACKGROUND COLOR, IN THIS CASE TO DARK BLUE.
+
+   gl.clearColor(1,1,1,0);
+   gl.clear(gl.COLOR_BUFFER_BIT);
+
+
+   // DRAW EVERYTHING
+
+   objectAtCursor = null;
+   root.draw();
+
+
+/********************************************************************************
+
+WHAT WE STILL HAVE NOT DONE YET -- AND WILL DO HERE IN THE NEXT LECTURE:
+
+   SET THE ROTATE AND SCALE SLIDER VALUES FOR THE CURRENTLY SELECTED OBJECT.
+
+********************************************************************************/
+
+}
+
+
+let root = new Object();
+let gui = root.add();
+let scene = root.add();
+
+
+
+let isPressed = false;
+
+
+canvas1.onPress = (x, y) => {
+   isPressed = true;
+   isDragged = false;
+   dragObject = objectAtCursor;
+}
+
+
+canvas1.onDrag = (x, y) => {
+   isDragged = true;
+
+   // DRAG THE OBJECT AT THE CURSOR TO TRANSLATE IT.
+
+   if (dragObject) {
+      let p = dragObject.translate;
+      p = viewMatrix.transform(p);
+      p[0] = x;
+      p[1] = y;
+      p = inverseViewMatrix.transform(p);
+      dragObject.translate = p;
+      transformObject(dragObject);
+   }
+}
+
+
+canvas1.onRelease = (x, y) => {
+
+   // CLICK ON THE BACKGROUND TO CREATE A NEW OBJECT.
+
+   if (! dragObject) {
+      let p = inverseViewMatrix.transform([x,y,0]);
+      let phong = materials[selectedColor];
+      let obj = scene.add(shapes[selectedShape], phong);
+      obj.translate = p;
+      obj.rotate = [0, 0, 0];
+      obj.scale = [1, 1, 1];
+      transformObject(obj);
+   }
+
+   // CLICK ON AN OBJECT TO SET ITS COLOR.
+
+   else if (! isDragged) 
+      dragObject.phong = materials[selectedColor];
+}
+
+
+// TRANSFORM AN OBJECT, USING ITS TRANSFORM PROPERTIES.
+
+let transformObject = obj => {
+   obj.identity()
+      .translate(obj.translate)
+      .rotateX(Math.PI * obj.rotate[0])
+      .rotateY(Math.PI * obj.rotate[1])
+      .rotateZ(Math.PI * obj.rotate[2])
+      .scale(obj.scale)
+      .scale(0.1);
+}
+
+
+canvas1.onMove = (x, y) => {
+   isPressed = false;
+   px = x;
+   py = y;
+}
+
+//assign backgrund canvas image
+var canvasb = document.getElementById("background-canvas"),
+    ctx = canvasb.getContext("2d");
+
+canvasb.width = 400;
+canvasb.height = 400;
+
+var background = new Image();
+background.src = "candy_jar.png";
+
+background.onload = function(){
+    ctx.drawImage(background,0,0);   
+}
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+
+</script>
+

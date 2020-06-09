@@ -1,0 +1,216 @@
+<script src=lib2.js></script>
+<style>
+  body{
+    background-color: lightblue;
+  }
+
+</style>
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+</center>
+</body>
+
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   varying   vec3 vPos;
+   void main() {
+      gl_Position = vec4(aPos, 1.);
+      vPos = aPos;
+   }
+</script>
+
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+float disk(vec2 xy, float x, float y, float r) {
+    xy = (xy - vec2(x, y)) / r;
+    return step(length(xy), 1.);
+ }
+
+ float edge(vec2 xy, float a, float b, float c) {
+    return step(a * xy.x + b * xy.y + c, 0.);
+ }
+
+ uniform float uTime;   // TIME, IN SECONDS
+
+ varying vec3 vPos;     // -1 < vPos.x < +1
+                        // -1 < vPos.y < +1
+                        //      vPos.z == 0
+
+ // CAMERA FOCAL LENGTH
+
+ float fl = 3.;
+
+ // GEOMETRY
+
+ vec4 Sph = vec4(0.,0.,-3., .8);
+
+ // LIGHT DIRECTION AND COLOR
+
+ vec3 Lg  = normalize(vec3(sin(uTime),1.,cos(uTime)));
+ vec3 Lcg = vec3(0.,1.,1.);
+
+vec3 Lr  = normalize(vec3(cos(uTime),1.,sin(uTime)));
+ vec3 Lcr = vec3(1.,0.,1.);
+
+vec3 Lb  = normalize(vec3(1.,sin(uTime),cos(uTime)));
+ vec3 Lcb = vec3(1.,1.,0.);
+
+
+vec3 Ly  = normalize(vec3(-sin(uTime),1.,-cos(uTime)));
+ vec3 Lcy = vec3(1.,0.,0.);
+
+ // REFLECTANCE: AMBIENT AND DIFFUSE
+
+ vec3 A = vec3(.025,.025,.1);
+ vec3 D = vec3(.5,.5,.2);
+
+ void main() {
+
+ 
+
+    // BACKGROUND COLOR
+
+    vec3 color = vec3(.1,.1,.4);
+
+    // COMPUTE RAY (V,W) AT THIS PIXEL
+
+    vec3 V = vec3(0.,0.,0.);
+    vec3 W = normalize(vec3(vPos.xy, -fl));
+
+    // OFFSET EVERYTHING BY SPHERE ORIGIN
+
+    vec3 Vp = V - Sph.xyz;
+
+    // COMPUTE QUADRATIC COEFFICIENTS
+
+    float B = dot(W, Vp);
+    float C = dot(Vp, Vp) - Sph.w * Sph.w;
+    float discr = B * B - C;
+
+    // IF DISCRIMINANT IS NOT NEGATIVE
+
+    if (discr >= 0.) {
+
+       // COMPUTE t.
+
+       float t = -B - sqrt(discr);
+
+       // IF t IS NOT NEGATIVE
+
+       if (t >= 0.) {
+
+          // COMPUTE SURFACE POINT AND NORMAL
+
+          vec3 P = V + t * W;
+    vec3 N = normalize(P - Sph.xyz);
+
+    vec3 Rg = 2.*(dot(N, Lg))*N-Lg;
+    vec3 Rr = 2.*(dot(N, Lr))*N-Lr;
+    vec3 Rb = 2.*(dot(N, Lb))*N-Lb;
+    vec3 Ry = 2.*(dot(N, Ly))*N-Ly;
+
+    float sg = max(0.,dot(-W,Rg));
+    float sr = max(0.,dot(-W,Rr));
+    float sb = max(0.,dot(-W,Rb));
+    float sy = max(0.,dot(-W,Ry));
+
+    sg = pow(sg,.5);
+    sr = pow(sr,.5);
+    sb = pow(sb,.5);
+    sy = pow(sy,.5);
+
+    vec3 specg = vec3(0,sg,sg);
+    vec3 specr = vec3(sr,0,sr);
+    vec3 specb = vec3(sb,sb,0);
+    vec3 specy = vec3(sy,0,0);
+
+    // DO SURFACE SHADING
+
+
+
+ color = A + Lcg * (D * max(0., dot(N,Lg))+specg)+Lcr * (D * max(0., dot(N,Lr))+specr)+Lcb * (D * max(0., dot(N,Lb))+specb)+Lcy * (D * max(0., dot(N,Ly))+specy);
+       }
+    }
+
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+
+<!!-------- CREATE A PROPERLY DESCRIPTIVE TITLE BELOW -------->
+
+<script id='my_title' type='text/html' style="font-size: 60px;text-shadow: 5px 10px 5px #999999;"><font color=black>
+GLARE TESTER BALL
+</script>
+
+
+<!!-------- HERE IS WHERE YOU CAN PROVIDE A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html' style = "font-style: oblique"><font color=black>
+This is a tool to test out the use of glare color in films. By adjusting the power, color and direction of motion, users can see what mood the glare light creates when overlapped. This technique can be used as preview in some scenery shots, but most importantly in film CGIs. It can replace the conventional lookbook in pre-production stages to decide the color scheme of the film as well.
+</script>
+
+
+<!!-------- YOU PROBABLY DON'T WANT TO CHANGE ANYTHING BELOW FOR NOW -------->
+   
+<script>
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+// SET THE CURRENT TIME IN SECONDS BEFORE RENDERING EACH FRAME.
+
+let startTime = Date.now();
+
+function animate(gl) {
+   let time = (Date.now() - startTime) / 1000;
+   setUniform('1f', 'uTime', time);
+}
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+</script>
+

@@ -1,0 +1,403 @@
+<script src=lib3.js></script>
+
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400 style="background-color:red"></canvas>
+
+<br>
+<input type=range min=1 max=100 value=50 class=slider id=slider1>
+
+</center>
+</body>
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   uniform mat4 uMat;
+   attribute vec3 aPos;
+   varying   vec3 vPos;
+   void main() {
+      gl_Position = uMat * vec4(aPos, 1.);
+      vPos = aPos;
+   }
+</script>
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ float disk(vec2 xy, float x, float y, float r) {
+    xy = (xy - vec2(x, y)) / r;
+    return step(length(xy), 1.);
+ }
+
+ float edge(vec2 xy, float a, float b, float c) {
+    return step(a * xy.x + b * xy.y + c, 0.);
+ }
+
+ uniform float uTime;   // TIME, IN SECONDS
+
+ const int nl = 2;
+ const int ns = 2;
+
+ uniform vec4 uSph[ns];
+ uniform vec3 uLCol[nl];
+ uniform mat4 uM[ns];
+
+ varying vec3 vPos;     // -1 < vPos.x < +1
+                        // -1 < vPos.y < +1
+                        //      vPos.z == 0
+
+ // CAMERA FOCAL LENGTH
+
+ float fl = 3.;
+
+ // LIGHT DIRECTION AND COLOR
+
+ vec3 Ld[nl];
+ //vec3 Lc[nl];
+
+ // GEOMETRY
+
+ //vec4 Sph[ns]; // SHAPE
+ //mat4 M[ns]; // REFLECTANCE
+
+ vec3 backgroundColor = vec3(1.,1.,0.);
+
+ float raySphere(vec3 V, vec3 W, vec4 Sph) {
+
+    float t = -1.;
+
+    // OFFSET EVERYTHING BY SPHERE ORIGIN
+
+    vec3 Vp = V - Sph.xyz;
+
+    // COMPUTE QUADRATIC COEFFICIENTS
+
+    float B = dot(W, Vp);
+    float C = dot(Vp, Vp) - Sph.w * Sph.w;
+    float discr = B * B - C;
+
+    // IF DISCRIMINANT IS NOT NEGATIVE
+
+    if (discr >= 0.)
+       t = -B - sqrt(discr); // COMPUTE t
+
+    return t;
+ }
+
+ vec3 doShading(vec3 P, vec3 N, vec3 E, mat4 M) {
+    mat4 material = M;
+    vec3 ambient = material[0].rgb;
+    vec3 diffuse = material[1].rgb;
+
+    vec3 color = ambient;
+
+    for (int il = 0 ; il < nl ; il++)
+       color += uLCol[il] * diffuse * max(0., dot(N,Ld[il]));
+
+    return color;
+ }
+
+ void main() {
+
+    // DEFINE LIGHTS
+
+    Ld[0] = normalize(vec3(1.,1.,1.));
+    //Lc[0] = vec3(.5,.5,1.);
+
+    Ld[1] = normalize(vec3(-1.,-1.,-1.));
+    //Lc[1] = vec3(.6,.4,.2);
+
+    // DEFINE SPHERES
+
+    //Sph[0] = vec4(0.,0.,-3., .4);
+    //Sph[1] = vec4(cos(uTime) ,0., -3. + sin(uTime), .4);
+
+    //M[0] = mat4(.025,.025,.1,0.,  .5,.5,.2,0.,  0.,0.,0.,0.,  0.,0.,0.,0.);
+    //M[1] = mat4(.0  ,.02 ,.0,0.,  .0,.5,.0,0.,  0.,0.,0.,0.,  0.,0.,0.,0.);
+
+    // BACKGROUND COLOR
+
+    vec3 color = backgroundColor;
+
+    // COMPUTE RAY (V,W) AT THIS PIXEL
+
+    vec3 V = vec3(0.,0.,0.);
+    vec3 W = normalize(vec3(vPos.xy, -fl));
+
+    float t0 = 10000.; // REALLY HONKING BIG t
+
+    for (int is = 0 ; is < ns ; is++) {
+
+       float t = raySphere(V, W, uSph[is]);
+
+       if (t >= 0. && t < t0) {
+
+          t0 = t;
+
+          // COMPUTE SURFACE POINT AND NORMAL
+
+          vec3 P = V + t * W;
+          vec3 N = normalize(P - uSph[is].xyz);
+          N += .3 * noise( N);
+
+          // DO SURFACE SHADING
+
+          color = doShading(P, N, -W, uM[is]);
+
+	  // FORM REFLECTION RAY
+
+          vec3 Vr = P;
+          vec3 Wr = 2. * dot(-W, N) * N + W;
+
+	  // FIND OUT WHAT THE REFLECTION RAY SEES
+
+          vec3 rColor = backgroundColor;
+          float tr0 = 10000.;
+	  for (int js = 0 ; js < ns ; js++) {
+	     float tr = raySphere(Vr, Wr, uSph[js]);
+	     if (tr >= 0. && tr < tr0) {
+	        tr0 = tr;
+                vec3 Pr = Vr + tr * Wr;
+                vec3 Nr = normalize(Pr - uSph[js].xyz);
+                rColor = doShading(Pr, Nr, -Wr, uM[js]);
+	     }
+	  }
+
+	  // ADD TINTED REFLECTION
+
+	  color += uM[is][3].rgb * rColor;
+       }
+    }
+
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+<!!-------- CREATE A PROPERLY DESCRIPTIVE TITLE BELOW -------->
+
+<script id='my_title' type='text/html'>
+Coronavirus Live Flyer
+</script>
+
+<!!-------- HERE IS WHERE YOU CAN PROVIDE A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+This is a live flyer for the Chinese government to rise people's awareness about coronavirus. The canvas is shaded with the colors of the Chinese flag, with the letter C representing both China and coronavirus. Within the C is a virus sphere floating around.
+</script>
+
+<!!-------- YOU PROBABLY DON'T WANT TO CHANGE ANYTHING BELOW FOR NOW -------->
+   
+<script>
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+// SET THE CURRENT TIME IN SECONDS BEFORE RENDERING EACH FRAME.
+
+let startTime = Date.now();
+
+let theta = 0, prevTime = startTime, rate = 1;
+
+// THIS METHOD GETS CALLED WHENEVER USER ADJUSTS THE SLIDER.
+
+slider1.oninput = function() {
+   rate = this.value / 50; 
+}
+
+function animate(gl) {
+   let time = (Date.now() - startTime) / 1000;
+
+   // VARY ROTATION RATE, DEPENDING ON SLIDER VALUE.
+
+   theta += 2 * rate * (time - prevTime);
+   prevTime = time;
+
+   // SET A UNIFORM OF TYPE float.
+
+   setUniform('1f', 'uTime', time);
+
+   // SET ARRAYS OF UNIFORMS OF TYPE vec3 AND vec4.
+
+   setUniform('4fv', 'uSph', [ 0,0,-3,.4,
+                               .9 * Math.cos(theta),0,-3 + .9 * Math.sin(theta),.4 ]);
+   setUniform('3fv', 'uLCol', [ .5,.5,.5,  .6,.4,.2 ]);
+
+   // SET AN ARRAY OF UNIFORMS OF TYPE mat4.
+
+   setUniform('Matrix4fv', 'uM', false, [
+      .025,.025,.1,0.,  .5,.5,.2,0.,  0.,0.,0.,0.,  1,1,1,0,
+      .0  ,.02 ,.0,0.,  .0,.5,.0,0.,  0.,0.,0.,0.,  0,1,0,0
+   ]);
+
+   // REPLACE THE FOLLOWING WITH AN IMPLEMENTATION THAT USES A Matrix OBJECT.
+   // SEE BELOW, WHERE I'VE GOTTEN YOU STARTED.
+
+   // let cr = Math.cos(3 * time);
+   // let sr = Math.sin(3 * time);
+   // let ct = Math.cos(time);
+   // let st = Math.sin(time);
+
+   // setUniform('Matrix4fv', 'uMat', false, [
+   //    .5*cr,.5*sr,0,0, -.5*sr,.5*cr,0,0, 0,0,.5,0, ct,st,0,1
+   // ]);
+
+   ////////////////////////////////////////////////////////////
+   //
+   // AFTER YOU DEFINE YOUR Matrix CLASS BELOW, THEN THE ABOVE
+   // MIGHT BE REPLACED BY SOMETHING LIKE THE FOLLOWING:
+
+   matrix.identity();
+   matrix.translate(Math.cos(time), Math.sin(time), 0);
+   matrix.rotateZ(3 * time);
+   matrix.scale(.5, .5, .5);
+
+   setUniform('Matrix4fv', 'uMat', false, matrix.getValue());
+
+}
+
+// HERE I AM PARTLY DEFINING A NEW OBJECT CLASS OF TYPE MATRIX.
+
+function Matrix() {
+   this.identity = function() {
+      value = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+      console.log("identity");
+      return this;
+   }
+   this.translate = function(x, y, z) {
+      let m = [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]; // (1) CREATE TRANSLATION MATRIX.
+      value = multiply(m, value);   
+      console.log("translate");                // (2) MULTIPLY TO CHANGE OBJECT value.
+      return this;
+   }
+   this.rotateX = function(theta) {
+    let m = [1,0,0,0,Math.cos(theta),Math.sin(theta),0,-Math.sin(theta),Math.cos(theta)];
+    value = multiply(m, value);
+      return this;
+   }
+
+   this.rotateY = function(theta) {
+      // YOU NEED TO IMPLEMENT ROTATION ABOUT X HERE
+    let m = [Math.cos(theta),0, -Math.sin(theta),0, 1, 0, Math.sin(theta),0,Math.cos(theta)];
+    value = multiply(m, value);
+      return this;
+   }
+
+    this.rotateZ = function(theta) {
+      // YOU NEED TO IMPLEMENT ROTATION ABOUT X HERE
+    let m = [Math.cos(theta),Math.sin(theta),-Math.sin(theta),Math.cos(theta), 0, 0, 0, 1];
+    value = multiply(m, value);
+      return this;
+   }
+
+    this.scale = function(size) {
+      // YOU NEED TO IMPLEMENT ROTATION ABOUT X HERE
+    let m = [size,0,0,0, 0,size,0,0, 0,0,size,0, 0,0,0,size];
+    value = multiply(m, value);
+      return this;
+   }
+
+   // GET THE CURRENT STATE OF THE Matrix OBJECT.
+
+    this.getValue = function() {
+      return value;
+   }
+
+   /////////////////////////////////////////////////////////////////////////////////
+   //
+   // NOTE: YOU ALSO NEED TO IMPLEMENT: this.rotateY(), this.rotateZ(), this.scale()
+   //
+   /////////////////////////////////////////////////////////////////////////////////
+
+   // INTERNAL VARIABLES AND FUNCTIONS FOR THE Matrix CLASS:
+
+   let value = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; // INTERNAL VALUE IS 16 NUMBERS.
+   let multiply = function(a,b){
+    console.log("multiply");
+      let c = [];
+      index = 0;
+      for(let i = 0; i < 4; i++){ //b
+        for(let j = 0; j < 4; j++){ //a
+          c[index] = a[j]*b[j]+a[j+4]*b[j+1]+a[j+4*2]*b[j+2]+a[j+4*3]*b[j+3];
+          //console.log("index: "+(4*i+j)+" value: "+c[4*i+j]);
+          index++;
+        }
+      }
+      console.log(c.length);
+      return c;
+   }
+
+   // let multiply = function(a, b) {
+   //    let c = [];
+   //    let index = 0;
+   //    let adim = Math.sqrt(a.length);
+   //    let bdim = Math.sqrt(b.length);
+   //    for(let i = 0; i < bdim;i++){
+   //      for(let j = 0; j < adim; j++){
+   //        //assuming that adim and bdim are the same
+   //        for(let x = 0; x < adim; x++){
+   //          c[index]+= a[j+adim*x]*b[bdim*i+x];
+   //        }
+
+   //        index++;
+   //      }
+   //    }
+   // //    // YOU NEED TO IMPLEMENT MATRIX MULTIPLY HERE.
+
+   // //    // REMEMBER TO LOOP THROUGH ROWS j OF a AND COLUMNS i OF b.
+   // //    // FOR EACH ROW j OF a AND COLUMN i OF b, DO A DOT PRODUCT
+   // //    // BETWEEN THAT ROW OF a AND COLUMN OF b,
+   // //    // TO COMPUTE A FLOATING POINT NUMBER.
+
+   // //    // THAT RESULT WILL GO INTO COLUMN i, ROW j OF c, WHICH IS: c[i + 4*j]
+
+   //    return c; // RETURN THE RESULT OF a x b. c SHOULD BE AN ARRAY OF 16 NUMBERS.
+   // }
+}
+
+// CREATE AN INSTANCE OF A MATRIX OBJECT.
+
+let matrix = new Matrix();
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+</script>
+

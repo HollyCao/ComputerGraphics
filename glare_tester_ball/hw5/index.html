@@ -1,0 +1,238 @@
+<script src=lib4.js></script>
+
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+
+<br>
+<input type=range min=1 max=100 value=50 class=slider id=rateSlider>
+
+</center>
+</body>
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   attribute vec3 aNor;
+   uniform   mat4 uMatF;
+   uniform   mat4 uMatI;
+   varying   vec3 vPos;
+   varying   vec3 vNor;
+   void main() {
+      vec4 pos = uMatF * vec4(aPos, 1.);
+      vec4 nor = vec4(aNor, 0.) * uMatI;
+      gl_Position = pos;
+      vPos = pos.xyz;
+      vNor = nor.xyz;
+   }
+</script>
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ const int nl = 2;            // NUMBER OF LIGHTS
+ uniform vec3  uLDir[nl];     // LIGHT DIRECTIONS
+ uniform vec3  uLCol[nl];     // LIGHT COLORS
+ uniform mat4  uM;            // MATERIAL PROPERTIES
+ uniform float uTime;         // TIME (CURRENTLY UNUSED)
+ varying vec3  vPos;
+ varying vec3  vNor;
+
+ void main() {
+    vec3 P = vPos;            // SURFACE POINT
+    vec3 N = normalize(vNor); // SURFACE NORMAL
+    vec3 E = vec3(0.,0.,1.);  // APPROX DIRECTION TO EYE
+
+    // UNPACK MATERIAL PROPERTIES MATRIX
+
+    mat4 material = uM;
+    vec3 ambient  = material[0].rgb;
+    vec3 diffuse  = material[1].rgb;
+    vec3 specular = material[2].rgb;
+    float p       = material[2].a;
+
+    // DO PHONG SHADING
+
+    vec3 color = ambient;
+    for (int i = 0 ; i < nl ; i++) {
+       vec3 R = 2. * dot(uLDir[i], N) * N - uLDir[i];
+       float d = max(0., dot(uLDir[i], N));
+       float s = pow(max(0., dot(E, R)), p);
+       color += uLCol[i] * (diffuse * d + specular * s);
+    }
+
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+<!!-------- A PROPERLY DESCRIPTIVE TITLE -------->
+
+<script id='my_title' type='text/html'>
+RENDERING TRIANGLE MESHES
+</script>
+
+<!!-------- A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+Two animated sphere meshes in one scene.
+</script>
+
+<script>
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+// USEFUL ANIMATION VARIABLES.
+
+let startTime = Date.now(), prevTime = startTime, rate = 1, theta = 0;
+
+// THIS METHOD GETS CALLED WHENEVER USER ADJUSTS THE SLIDER.
+
+rateSlider.oninput = function() {
+   rate = this.value / 50;
+}
+
+// DEFINE ANIMATION CALLBACK, WHICH WILL GET CALLED AT EVERY FRAME.
+
+function animate() {
+
+   // VARY THE ROTATION RATE DEPENDING ON THE SLIDER VALUE.
+
+   let time = (Date.now() - startTime) / 1000;
+   theta += 2 * rate * (time - prevTime);
+   prevTime = time;
+
+   // SET TIME IN THE GPU.
+
+   setUniform('1f', 'uTime', time);
+
+   // SET LIGHTS IN THE GPU.
+
+   setUniform('3fv', 'uLDir', [ .57,.57,.57, -.57,-.57,-.57 ]);
+   setUniform('3fv', 'uLCol', [ 1,1,1,  .25,.2,.15 ]);
+
+   // DRAW AN ANIMATING GOLD METAL ELLIPSOID.
+
+   setUniform('Matrix4fv', 'uM', false, [ .1,.03,0,0,  .12,.05,0,0,  1,.5,0,10,  1,1,1,0 ]);
+   matrix.identity();
+   matrix.translate(.5 * Math.sin(theta), -.4, 0);
+   matrix.scale(.2, .5, .2);
+   drawShape(sphere);
+
+   // DRAW AN ANIMATING RED PLASTIC ELLIPSOID.
+
+   setUniform('Matrix4fv', 'uM', false, [ .1,0,0,0,  .5,0,0,0,  1,1,1,20,  1,1,1,0 ]);
+   matrix.identity();
+   matrix.translate(0, .6 + .2 * Math.sin(2 * theta), 0);
+   matrix.scale(.5, .2, .2);
+   drawShape(sphere);
+}
+
+// SEND CURRENT MATRIX VALUE TO GPU, THEN DOWNLOAD AND DRAW THE SHAPE AS A TRIANGLE STRIP.
+
+let drawShape = shape => {
+   let m = matrix.getValue();
+   setUniform('Matrix4fv', 'uMatF', false, m);
+   setUniform('Matrix4fv', 'uMatI', false, invert(m));
+   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(shape), gl.STATIC_DRAW);
+   gl.drawArrays(gl.TRIANGLE_STRIP, 0, shape.length / stride);
+}
+
+// DEFINE A MATRIX CLASS.
+
+function Matrix() {
+   this.identity = function() {
+      value = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+      return this;
+   }
+   this.translate = function(x, y, z) {
+      let m = [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]; // (1) CREATE TRANSLATION MATRIX.
+      value = multiply(value, m);                   // (2) MULTIPLY TO CHANGE OBJECT value.
+      return this;
+   }
+   this.scale = function(x,y,z) {
+      let m = [x,0,0,0, 0,y,0,0, 0,0,z,0, 0,0,0,1]; // (1) CREATE SCALE MATRIX.
+      value = multiply(value, m);                   // (2) MULTIPLY TO CHANGE OBJECT value.
+      return this;
+   }
+   this.rotateX = function(theta) {                 // YOU NEED TO IMPLEMENT THIS
+      // ...
+      return this;
+   }
+   this.rotateY = function(theta) {                 // YOU NEED TO IMPLEMENT THIS
+      // ...
+      return this;
+   }
+   this.rotateZ = function(theta) {                 // YOU NEED TO IMPLEMENT THIS
+      // ...
+      return this;
+   }
+
+   // GET THE CURRENT STATE OF THE Matrix OBJECT.
+
+   this.getValue = function() {
+      return value;
+   }
+
+   // INTERNAL STUFF: CURRENT value AND multiply() FUNCTION.
+
+   let value = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; // INTERNAL VALUE IS 16 NUMBERS.
+
+   let multiply = function(a, b) {
+      let c = [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0];
+      for (let i = 0 ; i < 4 ; i++)
+      for (let j = 0 ; j < 4 ; j++)
+      for (let k = 0 ; k < 4 ; k++)
+         c[j + 4*i] += a[j + 4*k] * b[k + 4*i];
+      return c;
+   }
+}
+
+// CREATE AN INSTANCE OF A MATRIX OBJECT.
+
+let matrix = new Matrix();
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+
+</script>
+

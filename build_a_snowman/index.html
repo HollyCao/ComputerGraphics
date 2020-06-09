@@ -1,0 +1,933 @@
+<script src=lib9.js></script>
+
+<body bgcolor=lightblue text=black style = "font-family:'Comic Sans MS', cursive, sans-serif" link=white alink=white vlink=white>
+<center>
+<canvas id = 'background-canvas' style="position: absolute; left: 80%; top: 70%; z-index: 0;"></canvas>
+<audio autoplay loop controls>
+  <source src = "winter.mp3" type = "audio/mpeg">
+</audio>
+
+
+<!-- <img src = "candy_jar.png" width = 400 height = 400 style="position: absolute; left: 50%; top: 50%; z-index: 0;"> -->
+<canvas id='canvas1' width=400 height=400 style="position: absolute;  border: inset; left: 50%; top: 30%; z-index: 1;"></canvas>
+</center>
+
+<br>
+
+<div style = "position: absolute; top: 30%">
+  Take it for a spin
+  <input type=range min=1 max=100 value=50 class=slider id=rotateViewSlider>
+
+
+  <p>
+  <table><tr><td>Shape:<td><div id=shapeButtons></div></table>
+  <table><tr><td>Material:<td><div id=colorButtons></div></table>
+  <table><tr><td>House Type:<td><div id=houseBtn></div></table>
+</br>
+  <table>
+  <tr>
+  <td>Rotate
+  <br>X <input type=range min=1 max=100 value=50 class=slider id=rotateXSlider>
+  <br>Y <input type=range min=1 max=100 value=50 class=slider id=rotateYSlider>
+  <br>Z <input type=range min=1 max=100 value=50 class=slider id=rotateZSlider>
+  <br><br>
+  <button onClick = scaleDown()>Size 1</button>
+  <button onClick = scaleUp()>Size 2</button>
+  <br>
+
+
+
+<!--   <td>Scale
+<br>X <input type=range min=1 max=100 value=50 class=slider id=scaleXSlider>
+  <br>Y <input type=range min=1 max=100 value=50 class=slider id=scaleYSlider>
+  <br>Z <input type=range min=1 max=100 value=50 class=slider id=scaleZSlider>
+
+ -->  <td width=20>
+
+  <td>Position
+  <br>X <input type=range min=1 max=100 value=50 class=slider id=posXSlider>
+  <br>Y <input type=range min=1 max=100 value=50 class=slider id=posYSlider>
+  <br>Z <input type=range min=1 max=100 value=50 class=slider id=posZSlider>
+
+  <br><br>
+ Scale <input type=range min=1 max=100 value=50 class=slider id=scaleSlider>
+
+
+
+  </table>
+
+
+
+
+  
+    <br>
+<p>
+  <button onClick = toggleLook()><b>Look At Me</b></button><br><br>
+</p>
+<p>
+  <button onClick=deleteSelectedObject()><b>Remove</b></button>
+</p>
+  <p>
+  <button onClick = aniThrow()><b>Throw</b></button>
+  <button onClick = aniJump()><b>Jump</b></button>
+  <button onClick = aniWaddle()><b>Waddle</b></button>
+  <button onClick = aniSpin()><b>Spin</b></button>
+</p>
+</div>
+
+
+
+<!--                START OF IMPLEMENTING SNOWFLAKE, code based off of tutorial https://www.kirupa.com/html5/the_falling_snow_effect.htm     -->
+
+<style>
+  #snowflakeContainer {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    display: none;
+  }
+
+  .snowflake {
+    position: fixed;
+    background-color: #FFF;
+    user-select: none;
+    z-index: 1000;
+    pointer-events: none;
+    border-radius: 50%;
+    width: 10px;
+    height: 10px;
+  }
+</style>
+
+<div id="snowflakeContainer">
+  <span class="snowflake"></span>
+</div>
+
+<script>
+  // Array to store our Snowflake objects
+  var snowflakes = [];
+
+  // Global variables to store our browser's window size
+  var browserWidth;
+  var browserHeight;
+
+  // Specify the number of snowflakes you want visible
+  var numberOfSnowflakes = 100;
+
+  // Flag to reset the position of the snowflakes
+  var resetPosition = false;
+
+  // Handle accessibility
+  var enableAnimations = false;
+  var reduceMotionQuery = matchMedia("(prefers-reduced-motion)");
+
+  // Handle animation accessibility preferences 
+  function setAccessibilityState() {
+    if (reduceMotionQuery.matches) {
+      enableAnimations = false;
+    } else { 
+      enableAnimations = true;
+    }
+  }
+  setAccessibilityState();
+
+  reduceMotionQuery.addListener(setAccessibilityState);
+
+  //
+  // It all starts here...
+  //
+  function setup() {
+    if (enableAnimations) {
+      window.addEventListener("DOMContentLoaded", generateSnowflakes, false);
+      window.addEventListener("resize", setResetFlag, false);
+    }
+  }
+  setup();
+
+  //
+  // Constructor for our Snowflake object
+  //
+  function Snowflake(element, speed, xPos, yPos) {
+    // set initial snowflake properties
+    this.element = element;
+    this.speed = speed;
+    this.xPos = xPos;
+    this.yPos = yPos;
+    this.scale = 1;
+
+    // declare variables used for snowflake's motion
+    this.counter = 0;
+    this.sign = Math.random() < 0.5 ? 1 : -1;
+
+    // setting an initial opacity and size for our snowflake
+    this.element.style.opacity = (.1 + Math.random()) / 3;
+  }
+
+  //
+  // The function responsible for actually moving our snowflake
+  //
+  Snowflake.prototype.update = function () {
+    // using some trigonometry to determine our x and y position
+    this.counter += this.speed / 5000;
+    this.xPos += this.sign * this.speed * Math.cos(this.counter) / 40;
+    this.yPos += Math.sin(this.counter) / 40 + this.speed / 30;
+    this.scale = .5 + Math.abs(10 * Math.cos(this.counter) / 20);
+
+    // setting our snowflake's position
+    setTransform(Math.round(this.xPos), Math.round(this.yPos), this.scale, this.element);
+
+    // if snowflake goes below the browser window, move it back to the top
+    if (this.yPos > browserHeight) {
+      this.yPos = -50;
+    }
+  }
+
+  //
+  // A performant way to set your snowflake's position and size
+  //
+  function setTransform(xPos, yPos, scale, el) {
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0) scale(${scale}, ${scale})`;
+  }
+
+  //
+  // The function responsible for creating the snowflake
+  //
+  function generateSnowflakes() {
+
+    // get our snowflake element from the DOM and store it
+    var originalSnowflake = document.querySelector(".snowflake");
+
+    // access our snowflake element's parent container
+    var snowflakeContainer = originalSnowflake.parentNode;
+    snowflakeContainer.style.display = "block";
+
+    // get our browser's size
+    browserWidth = document.documentElement.clientWidth;
+    browserHeight = document.documentElement.clientHeight;
+
+    // create each individual snowflake
+    for (var i = 0; i < numberOfSnowflakes; i++) {
+
+      // clone our original snowflake and add it to snowflakeContainer
+      var snowflakeClone = originalSnowflake.cloneNode(true);
+      snowflakeContainer.appendChild(snowflakeClone);
+
+      // set our snowflake's initial position and related properties
+      var initialXPos = getPosition(50, browserWidth);
+      var initialYPos = getPosition(50, browserHeight);
+      var speed = 5 + Math.random() * 40;
+
+      // create our Snowflake object
+      var snowflakeObject = new Snowflake(snowflakeClone,
+        speed,
+        initialXPos,
+        initialYPos);
+      snowflakes.push(snowflakeObject);
+    }
+
+    // remove the original snowflake because we no longer need it visible
+    snowflakeContainer.removeChild(originalSnowflake);
+
+    moveSnowflakes();
+  }
+
+  //
+  // Responsible for moving each snowflake by calling its update function
+  //
+  function moveSnowflakes() {
+
+    if (enableAnimations) {
+      for (var i = 0; i < snowflakes.length; i++) {
+        var snowflake = snowflakes[i];
+        snowflake.update();
+      }      
+    }
+
+    // Reset the position of all the snowflakes to a new value
+    if (resetPosition) {
+      browserWidth = document.documentElement.clientWidth;
+      browserHeight = document.documentElement.clientHeight;
+
+      for (var i = 0; i < snowflakes.length; i++) {
+        var snowflake = snowflakes[i];
+
+        snowflake.xPos = getPosition(50, browserWidth);
+        snowflake.yPos = getPosition(50, browserHeight);
+      }
+
+      resetPosition = false;
+    }
+
+    requestAnimationFrame(moveSnowflakes);
+  }
+
+  //
+  // This function returns a number between (maximum - offset) and (maximum + offset)
+  //
+  function getPosition(offset, size) {
+    return Math.round(-1 * offset + Math.random() * (size + 2 * offset));
+  }
+
+  //
+  // Trigger a reset of all the snowflakes' positions
+  //
+  function setResetFlag(e) {
+    resetPosition = true;
+  }
+</script> 
+
+ <!--              END OF IMPLEMENTING SNOWFLAKE     -->
+
+
+
+
+</body>
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   attribute vec3 aNor;
+   attribute vec2 aUV;
+   uniform   mat4 uPMat;
+   uniform   mat4 uMatF;
+   uniform   mat4 uMatI;
+   varying   vec3 vaPos;
+   varying   vec3 vPos;
+   varying   vec3 vNor;
+   varying   vec2 vUV;
+   void main() {
+      vec4 pos = uPMat * uMatF * vec4(aPos, 1.);
+      vec4 nor = vec4(aNor, 0.) * uMatI;
+      gl_Position = pos * vec4(1.,1.,1./10.,1.);
+      vaPos = aPos;
+      vPos = pos.xyz;
+      vNor = nor.xyz;
+      vUV  = aUV;
+   } 
+
+</script>
+
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ const int nl = 3;            // NUMBER OF LIGHTS
+ uniform vec3  uLDir[nl];     // LIGHT DIRECTIONS
+ uniform vec3  uLCol[nl];     // LIGHT COLORS
+ uniform mat4  uM;            // MATERIAL PROPERTIES
+ uniform float uTime;         // TIME (CURRENTLY UNUSED)
+ varying vec3  vPos;
+ varying vec3  vaPos;
+ varying vec3  vNor;
+ varying vec2  vUV;
+
+ void main() {
+    vec3 P = vPos;            // SURFACE POINT
+    vec3 N = normalize(vNor); // SURFACE NORMAL
+    vec3 E = vec3(0.,0.,1.);  // APPROX DIRECTION TO EYE
+
+    // UNPACK MATERIAL PROPERTIES MATRIX
+
+    mat4 material = uM;
+    vec3 ambient  = material[0].rgb;
+    vec3 diffuse  = material[1].rgb;
+    vec3 specular = material[2].rgb;
+    float p       = material[2].a;
+    float ta      = material[3].r;
+    float tf      = material[3].g;
+
+    // DO PHONG SHADING
+
+    vec3 color = ambient;
+    for (int i = 0 ; i < nl ; i++) {
+       vec3 R = 2. * dot(uLDir[i], N) * N - uLDir[i];
+       float d = max(0., dot(uLDir[i], N));
+       float s = pow(max(0., dot(E, R)), p);
+       color += uLCol[i] * (diffuse * d + specular * s);
+    }
+    color += specular * .02 * (.1 + noise(2. * N)) * N.z;
+    if (ta != 0.)
+       color *= 1. + ta * noise(vec3(tf * vUV, 0.));
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+<!!-------- A PROPERLY DESCRIPTIVE TITLE -------->
+
+<script id='my_title' type='text/html'>
+BLOODY SNOWMAN
+</script>
+
+<!!-------- A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+Build a snowman martini and watch it come alive!
+</script>
+
+<script>
+
+
+
+let green          = phong([0,.1,0], [0,.1,0], [1,1,1], 20);
+let brass                 = phong([.02,.012,0], [.02,.012,0], [1,.6,0], 10);
+let gold                  = phong([.1,.03,0], [.12,.05,0], [1,.5,0], 10);
+let carrot         = phong([1,.25,0], [1,.25,0], [1,1,1], 10);
+let chilli   = phong([.1,0,0], [.5,0,0], [1,1,1], 50, 5, 10);
+let red          = phong([.2,0,0], [.2,0,0], [0,0,0], 20, 1, 10);
+let steel                 = phong([.02,.02,.02], [.02,.02,.02], [1,1,1], 10);
+let white_gold            = phong([.01,.01,.008], [0,0,0], [2,2,1.6], 40);
+let snow = phong([.5,.5,.5], [.5,.5,.5], [1,1,1], 20,.5,40);
+let white_plastic         = phong([.1,.1,.1], [.5,.5,.5], [1,1,1], 20);
+let popcorn   = phong([.8,.8,0], [1,0,0], [1,1,1], 50, 5, 10);
+let mud   = phong([.1,.05,.05], [.1,.05,.05], [.2,.2,.2], 40);
+
+let look = true;
+
+
+let colors = 'white,orange,brown, green, red'.split(',');
+let flavors = 'snow, carrot, mud, leaf, fabric'.split(',');
+
+let house = 'gingerbread, candy jar, glass castle'.split(',');
+let backgrounds = 'ginger_bread.png,candy_jar.png, glass_castle.png'.split(',');
+//background.src  = "backgrounds[n]"
+
+var background = new Image();
+
+let materials = [ snow, carrot, mud, green, red];
+let selectedColor = 0;
+
+let selectedHouse = 0;
+
+(() => {
+   let s = '';
+   for (let n = 0 ; n < house.length ; n++) {
+      let name = house[n];
+      s += '<button '
+         + 'id=houseBtn' + n + ' '
+   + 'style=\'border-syle:none\''
+   + 'onClick=selectBackground(' + n + ')>'
+   + '<b>' + name + '</b>'
+         + '</button> '
+   }
+   houseBtn.innerHTML = s;
+})();
+
+let selectBackground = n => {
+   selectedHouse = n;
+   background.src = backgrounds[n];
+   for (let n = 0 ; n < backgrounds.length ; n++) {
+      let button = document.getElementById('houseBtn' + n);
+      let bgColor = n == selectedHouse ? 'white' : 'gray';
+      button.style.backgroundColor = bgColor;
+   }
+}
+
+selectBackground(0);
+
+
+
+
+
+// BUILD ALL OF THE COLOR BUTTONS.
+
+(() => {
+   let s = '';
+   for (let n = 0 ; n < colors.length ; n++) {
+      s += '<input type=button '
+         + 'id=colorButton' + n + ' '
+         + 'value= ' + flavors[n] + ' '
+	 + 'style=\'background-color:' + colors[n] + '; color: black \''
+	 + 'onClick = selectColor(' + n + ')'
+         + '>\n';
+   }
+   colorButtons.innerHTML = s;
+})();
+
+let selectColor = n => {
+   selectedColor = n;
+   for (let i = 0 ; i < colors.length ; i++) {
+      let button = window['colorButton' + i];
+      button.style.height = i == n ? 30 : 20;
+   }
+}
+
+selectColor(0);
+
+
+
+
+
+let shapeNames = 'ball, eye, cube, nose, column, hat, martini'.split(',');
+let shapes = [ sphere,eye, cube ,cone, cylinder, hat, martiniGlass];
+
+
+let selectedShape = 0;
+
+// BUILD ALL OF THE SHAPE BUTTONS.
+
+(() => {
+   let s = '';
+   for (let n = 0 ; n < shapeNames.length ; n++) {
+      let name = shapeNames[n];
+      s += '<button '
+         + 'id=shapeButton' + n + ' '
+	 + 'style=\'border-syle:none\''
+	 + 'onClick=selectShape(' + n + ')>'
+	 + '<b>' + name + '</b>'
+         + '</button> '
+   }
+   shapeButtons.innerHTML = s;
+})();
+
+let selectShape = n => {
+   selectedShape = n;
+   for (let n = 0 ; n < shapeNames.length ; n++) {
+      let button = document.getElementById('shapeButton' + n);
+      let bgColor = n == selectedShape ? 'white' : 'gray';
+      button.style.backgroundColor = bgColor;
+   }
+}
+
+selectShape(0);
+
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+
+/********************************************************************************
+WE ARE COMMENTING THIS OUT SO THAT THE FRAGMENT SHADER EDITOR DOES NOT APPEAR.
+   
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+********************************************************************************/
+
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+
+/********************************************************************************
+WE ALSO COMMENT THIS OUT, AS PART OF COMMENTING OUT THE FRAGMENT SHADER EDITOR.
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+********************************************************************************/
+
+
+// USEFUL ANIMATION VARIABLES.
+
+let startTime = Date.now(), prevTime = startTime, rate = 1, theta = 0;
+
+
+// DELETE THE SELECTED OBJECT.
+
+let deleteSelectedObject = () => {
+   if (selectedObject)
+      selectedObject.delete();
+}
+
+let bounce = 0;
+let away = true;
+
+
+let ANIMATE;
+
+let aniThrow = () =>{
+  bounce = 0;
+  away = true;
+  ANIMATE = "throw";
+}
+let aniJump = () =>{
+  bounce = 0;
+  away = true;
+  ANIMATE = "jump";
+}
+let aniWaddle = () =>{
+  bounce = 0;
+  away = true;
+  ANIMATE = "waddle";
+}
+let aniSpin = () =>{
+  ANIMATE = "spin";
+}
+
+let toggleLook = () =>{
+  if(look){
+    look = false;
+  }
+  else{
+    look = true;
+  }
+}
+
+let scaleUp = () =>{
+  if(selectedObject){
+    selectedObject.scale = 2;
+    transformObject(selectedObject);
+  }
+}
+
+let scaleDown = () =>{
+  if(selectedObject){
+    selectedObject.scale = 1;
+    transformObject(selectedObject);
+  }
+
+}
+
+// THIS METHOD GETS CALLED WHENEVER THE USER ADJUSTS THE VIEW ROTATION SLIDER.
+
+rotateViewSlider.oninput = function() {
+   theta = Math.PI * (.5 - this.value / 50);
+}
+
+
+// RESPONSE TO USER ADJUSTING SLIDER VALUES FOR ROTATING THE SELECTED OBJECT.
+
+rotateXSlider.oninput = function() { rotateAboutAxis(0, this.value / 50 - 1); }
+rotateYSlider.oninput = function() { rotateAboutAxis(1, this.value / 50 - 1); }
+rotateZSlider.oninput = function() { rotateAboutAxis(2, this.value / 50 - 1); }
+
+let rotateAboutAxis = (axis, value) => {
+   if (selectedObject) {
+      selectedObject.rotate[axis] = value;
+      transformObject(selectedObject);
+   }
+}
+
+
+// RESPONSE TO USER ADJUSTING SLIDER VALUES FOR SCALING THE SELECTED OBJECT.
+scaleSlider.oninput = function() {
+  scaleAboutAxis(0, this.value / 50); 
+  scaleAboutAxis(1, this.value / 50);
+  scaleAboutAxis(2, this.value / 50);
+}
+
+// scaleXSlider.oninput = function() {scaleAboutAxis(0, this.value / 50); }
+// scaleYSlider.oninput = function() {scaleAboutAxis(1, this.value / 50); }
+// scaleZSlider.oninput = function() {scaleAboutAxis(2, this.value / 50); }
+
+posXSlider.oninput = function(){ positionAboutAxis(0, this.value / 50); }
+posYSlider.oninput = function(){ positionAboutAxis(1, this.value / 50); }
+posZSlider.oninput = function(){ positionAboutAxis(2, this.value / 50); }
+
+
+
+let scaleAboutAxis = (axis, value) => {
+   if (selectedObject) {
+      selectedObject.scale[axis] = value;
+      transformObject(selectedObject);
+   }
+}
+
+let positionAboutAxis = (axis, value) =>{ //not exactly working cuz the other two positions are always set to 0, need relative position not absolute
+     if (selectedObject) {
+      // let t = [0,0,0];
+      // t[axis] = value;
+      // selectedObject.translate(t);
+
+      // selectedObject = viewMatrix.transform(selectedObject);
+
+        let p = selectedObject.translate;
+        p = viewMatrix.transform(p);
+        p = [0,0,0];
+
+        p[axis] = value-1;
+
+        p = inverseViewMatrix.transform(p);
+        selectedObject.translate = p;
+        transformObject(selectedObject);
+        
+   }
+}
+
+
+// DEFINE ANIMATION CALLBACK, WHICH WILL GET CALLED AT EVERY FRAME.
+
+let time = 0;
+
+let viewMatrix = new Matrix();
+let inverseViewMatrix = new Matrix();
+
+
+
+function animate() {
+
+   // VARY THE ROTATION RATE DEPENDING ON THE SLIDER VALUE.
+
+   time = (Date.now() - startTime) / 1000;
+   
+
+   // SET TIME IN THE GPU.
+
+   setUniform('1f', 'uTime', time);
+
+   // SET LIGHTS IN THE GPU.
+
+   setUniform('3fv', 'uLDir', [ .57,.57,.57, -.57,-.57,-.57, -.8,-.6,0 ]);
+   setUniform('3fv', 'uLCol', [ 1,1,1,        .25,.2,.15,     .2,.18,.16 ]);
+
+   // DRAW EVERYTHING.
+
+   viewMatrix.identity().rotateY(theta);
+
+   inverseViewMatrix.setValue(viewMatrix.getValue());
+   inverseViewMatrix.invert();
+
+   scene.identity().multiply(viewMatrix);
+
+
+
+   if(ANIMATE == "throw"){
+      
+
+      theta += 2 * rate * (time - prevTime);
+      prevTime = time;
+      let s = Math.sin(5 * theta);
+      let c = Math.cos(5 * theta);
+     
+      if(away == true){//going from right to left
+          scene.identity().translate((bounce)*.01,Math.sin(bounce/32)/4,0);
+        bounce++;
+        if(bounce == 64){
+          away = false;
+        }
+      }
+      else{ //going from left back to right
+          scene.identity().translate((bounce) *.01,Math.cos(bounce/32)/4,0);
+         bounce--;
+        if(bounce == 0){
+          away = true;
+        }
+      }
+   }
+
+   else if(ANIMATE == "jump"){
+      theta += 2 * rate * (time - prevTime);
+      prevTime = time;
+      let s = Math.sin(5 * theta);
+      let c = Math.cos(5 * theta);
+
+
+      if(away){ //jumping up
+        scene.identity().translate(0,Math.sin(bounce/32)/4,0);
+        bounce++;
+        if(bounce == 32){
+          away = false;
+        }
+      }
+      else{ //jumping down
+        scene.identity().translate(0,Math.sin(bounce/32)/4,0);
+        bounce --;
+        if(bounce == 0){
+          away = true;
+        }
+      }
+
+
+   }
+   else if(ANIMATE == "waddle"){
+      theta += 2 * rate * (time - prevTime);
+      prevTime = time;
+      let s = Math.sin(5 * theta);
+      let c = Math.cos(5 * theta);
+      scene.identity().rotateY(s*.5);
+   }
+   else if(ANIMATE == "spin"){
+      theta += 2 * rate * (time - prevTime);
+      prevTime = time;
+      let s = Math.sin(5 * theta);
+      let c = Math.cos(5 * theta);
+   }
+
+   // SET THE BACKGROUND COLOR, IN THIS CASE TO DARK BLUE.
+
+   gl.clearColor(1,1,1,0);
+   gl.clear(gl.COLOR_BUFFER_BIT);
+
+
+   // DRAW EVERYTHING
+
+   objectAtCursor = null;
+   root.draw();
+
+
+/********************************************************************************
+
+WHAT WE STILL HAVE NOT DONE YET -- AND WILL DO HERE IN THE NEXT LECTURE:
+
+   SET THE ROTATE AND SCALE SLIDER VALUES FOR THE CURRENTLY SELECTED OBJECT.
+
+********************************************************************************/
+
+}
+
+
+let root = new Object();
+let gui = root.add();
+let scene = root.add();
+
+
+
+let isPressed = false;
+
+
+canvas1.onPress = (x, y) => {
+   isPressed = true;
+   isDragged = false;
+   dragObject = objectAtCursor;
+}
+
+
+canvas1.onDrag = (x, y) => {
+   isDragged = true;
+
+   // DRAG THE OBJECT AT THE CURSOR TO TRANSLATE IT.
+
+   if (dragObject) {
+      let p = dragObject.translate;
+      p = viewMatrix.transform(p);
+      p[0] = x;
+      p[1] = y;
+      p = inverseViewMatrix.transform(p);
+      dragObject.translate = p;
+      transformObject(dragObject);
+   }
+}
+
+
+canvas1.onRelease = (x, y) => {
+
+   // CLICK ON THE BACKGROUND TO CREATE A NEW OBJECT.
+
+   if (! dragObject) {
+      let p = inverseViewMatrix.transform([x,y,0]);
+      let phong = materials[selectedColor];
+      let obj = scene.add(shapes[selectedShape], phong);
+      obj.translate = p;
+      
+      if(selectedShape == 1){ //eye
+        obj.rotate = [0,0,0];
+        obj.scale = [.1,.2,.05];
+
+        let p = obj.translate;
+        p = viewMatrix.transform(p);
+        p[0] = 0;
+        p[1] = 0;
+        p[2] = .1;
+        p = inverseViewMatrix.transform(p);
+        obj.translate = p;
+        transformObject(obj);
+      }
+      else if(selectedShape == 3){  //nose
+
+        obj.rotate=[0,0,0];
+        obj.scale = [.5, .5, 2];
+      }
+      else if(selectedShape == 5){  //hat
+        obj.rotate=[.5,0,0];
+        obj.scale = [1, 1, 1];
+      }
+      else if(selectedShape == 6){  //martini
+        obj.rotate=[.5,0,0];
+        obj.scale = [2, 2, 2];
+      }
+      else{
+        obj.rotate = [0, 0, 0];
+        obj.scale = [1, 1, 1];
+      }
+
+      transformObject(obj);
+   }
+
+   // CLICK ON AN OBJECT TO SET ITS COLOR.
+
+   else if (! isDragged) 
+      dragObject.phong = materials[selectedColor];
+}
+
+
+// TRANSFORM AN OBJECT, USING ITS TRANSFORM PROPERTIES.
+
+let transformObject = obj => {
+   obj.identity()
+      .translate(obj.translate)
+      .rotateX(Math.PI * obj.rotate[0])
+      .rotateY(Math.PI * obj.rotate[1])
+      .rotateZ(Math.PI * obj.rotate[2])
+      .scale(obj.scale)
+      .scale(0.1);
+}
+
+
+canvas1.onMove = (x, y) => {
+   isPressed = false;
+   px = x;
+    py = y;
+   if(look){
+    theta = Math.PI * x/5;
+   }
+   
+
+   
+}
+
+
+
+
+//assign backgrund canvas image
+var canvasb = document.getElementById("background-canvas"),
+    ctx = canvasb.getContext("2d");
+
+canvasb.width = 400;
+canvasb.height = 400;
+
+//var background = new Image();
+//background.src = "candy_jar.png";
+
+background.onload = function(){
+    ctx.clearRect(0, 0, canvasb.width, canvasb.height);
+    ctx.drawImage(background,0,0);
+}
+
+
+
+
+
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+
+</script>
+

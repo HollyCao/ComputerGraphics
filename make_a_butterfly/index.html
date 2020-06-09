@@ -1,0 +1,375 @@
+
+<script src=lib7.js></script>
+
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+
+<br>
+<input type=range min=1 max=100 value=50 class=slider id=rateSlider>
+<input type = button id = "rotate" value = "rotate">
+</center>
+</body>
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   attribute vec3 aNor;
+   attribute vec2 aUV;
+   uniform   mat4 uPMat;
+   uniform   mat4 uMatF;
+   uniform   mat4 uMatI;
+   varying   vec3 vaPos;
+   varying   vec3 vPos;
+   varying   vec3 vNor;
+   varying   vec2 vUV;
+   void main() {
+      vec4 pos = uPMat * uMatF * vec4(aPos, 1.);
+      vec4 nor = vec4(aNor, 0.) * uMatI;
+      gl_Position = pos * vec4(1.,1.,1./10.,1.);
+      vaPos = aPos;
+      vPos = pos.xyz;
+      vNor = nor.xyz;
+      vUV  = aUV;
+   }
+</script>
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ const int nl = 3;            // NUMBER OF LIGHTS
+ uniform vec3  uLDir[nl];     // LIGHT DIRECTIONS
+ uniform vec3  uLCol[nl];     // LIGHT COLORS
+ uniform mat4  uM;            // MATERIAL PROPERTIES
+ uniform float uTime;         // TIME (CURRENTLY UNUSED)
+ varying vec3  vPos;
+ varying vec3  vaPos;
+ varying vec3  vNor;
+ varying vec2  vUV;
+
+ void main() {
+    vec3 P = vPos;            // SURFACE POINT
+    vec3 N = normalize(vNor); // SURFACE NORMAL
+    vec3 E = vec3(0.,0.,1.);  // APPROX DIRECTION TO EYE
+
+    // UNPACK MATERIAL PROPERTIES MATRIX
+
+    mat4 material = uM;
+    vec3 ambient  = material[0].rgb;
+    vec3 diffuse  = material[1].rgb;
+    vec3 specular = material[2].rgb;
+    float p       = material[2].a;
+    float ta      = material[3].r;
+    float tf      = material[3].g;
+
+    // DO PHONG SHADING
+
+    vec3 color = ambient;
+    for (int i = 0 ; i < nl ; i++) {
+       vec3 R = 2. * dot(uLDir[i], N) * N - uLDir[i];
+       float d = max(0., dot(uLDir[i], N));
+       //float p2 = p * (1. + noise(vec3(10. * vUV, 0.)));
+       //float p2 = p * (1. + noise(10. * vaPos));
+       float s = pow(max(0., dot(E, R)), p);
+       color += uLCol[i] * (diffuse * d + specular * s);
+    }
+    color += specular * .02 * (.1 + noise(2. * N)) * N.z;
+    if (ta != 0.)
+       color *= 1. + ta * noise(vec3(tf * vUV, 0.));
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+<!!-------- A PROPERLY DESCRIPTIVE TITLE -------->
+
+<script id='my_title' type='text/html'>
+Make Your Own Butterfly
+</script>
+
+<!!-------- A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+<p>
+Make your own golden crown for the pearl butterfly! Click on the canvas to make your butterfly grow a wing towards that direction and click rotate to admire it, and use the speed control to decide how fast you want it to rotate. If you are not satisfied with your butterfly, stop it from rotating and add more! If you're feeling adventurous, you can try to add wings when it is rotating, but nothing is guarenteed...
+</script>
+
+<script>
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+// USEFUL ANIMATION VARIABLES.
+
+let startTime = Date.now(), prevTime = startTime, rate = 1, theta = 0;
+
+// THIS METHOD GETS CALLED WHENEVER USER ADJUSTS THE SLIDER.
+
+rateSlider.oninput = function() {
+   rate = this.value / 50;
+}
+
+let gold          = phong([.1,.03,0], [.12,.05,0], [1,.5,0], 10);
+let red_plastic   = phong([.1,0,0], [.5,0,0], [1,1,1], 20, 1, 20);
+let green_plastic = phong([0,.1,0], [0,.5,0], [1,1,1], 20);
+let blue_plastic  = phong([0,.05,.1], [0,.25,.5], [1,1,1], 20);
+let white_plastic = phong([.1,.1,.1], [.5,.5,.5], [1,1,1], 20, 1, 20);
+let white_pearl   = phong([.1,.1,.08], [0,0,0], [2,2,1.6], 40);
+let steel         = phong([.02,.02,.02], [.02,.02,.02], [1,1,1], 10);
+let brass         = phong([.02,.012,0], [.02,.012,0], [1,.6,0], 10);
+
+// DEFINE ANIMATION CALLBACK, WHICH WILL GET CALLED AT EVERY FRAME.
+
+let time = 0;
+
+function animate() {
+
+   // VARY THE ROTATION RATE DEPENDING ON THE SLIDER VALUE.
+
+   time = (Date.now() - startTime) / 1000;
+   theta += 2 * rate * (time - prevTime);
+   prevTime = time;
+
+   // SET TIME IN THE GPU.
+
+   setUniform('1f', 'uTime', time);
+
+   // SET LIGHTS IN THE GPU.
+
+   setUniform('3fv', 'uLDir', [ .57,.57,.57, -.57,-.57,-.57, -.8,-.6,0 ]);
+   setUniform('3fv', 'uLCol', [ 1,1,1,        .25,.2,.15,     .2,.18,.16 ]);
+
+   // SET PERPECTIVE MATRIX.
+
+   setUniform('Matrix4fv', 'uPMat', false, perspectiveMatrix);
+
+   // ANIMATE THE TEST OBJECT.
+
+   // let s = Math.sin(5 * theta);
+   // let c = Math.cos(5 * theta);
+   //test.identity().scale(.5);
+   rotation(test, theta);
+   //test.identity().rotateX(theta).rotateY(theta/2).scale(.5);
+
+  
+   // DRAW EVERYTHING.
+
+   root.identity()
+       .rotateY(rotX)
+       .rotateX(rotY);
+
+   root.draw();
+}
+
+
+let perspectiveMatrix = createPerspectiveMatrix(3);
+let matrix = new Matrix();
+let root = new Object();
+let test = root.add();
+//let pearl = root.add();
+
+function rotation(test, theta){
+  test.identity().scale(.5);
+}
+
+let btn = document.querySelector("#rotate");
+btn.addEventListener('click',(evt)=>{
+  evt.preventDefault();
+  if(btn.value == "rotate"){
+    btn.value = "stop";
+    rotation = (test, theta)=>{
+      let s = Math.sin(5 * theta);
+      let c = Math.cos(5 * theta);
+      test.identity().rotateX(theta).rotateY(theta/2).scale(.5);
+    }
+  }
+  else{
+    btn.value = "rotate";
+    rotation = (test, theta)=>{
+      test.identity().scale(.5);
+    }
+  }
+});
+
+//  let pearlZ = 0;
+
+//  let inc = 0;
+
+
+// canvas1.onPress = () => {
+//   inc+=.1;
+//   console.log("Pressed "+(pearlZ+inc));
+// }  
+
+
+//pearl.add(sphere, white_pearl).scale(.1);
+
+// CREATE A BRASS TACK AS A SURFACE OF REVOLUTION.
+
+// let myTack = createTriangleMesh(uvToLathe, 30, 30,
+//    [
+//       [0,.05, .05,.075,.5, .5,0], // r
+//       [-1,-.7, 0,.85,.92, 1,1]     // z
+//    ]
+// );
+// test.add(myTack, brass);
+
+
+// SAMPLE A SPLINE PATH, PUT SMALL BLUE PLASTIC SPHERES ALONG THE PATH.
+
+// let path = sampleBezierPath( [-1,-1/3, 1/3, 1],  // X keys
+//                              [ 1,-1,   1  ,-1],  // Y keys
+//                              [ 1,-1,  -1  , 1],  // Z keys
+// 			     60);                // number of samples
+
+// for (let n = 0 ; n < path.length ; n++) {
+//    test.add(sphere, blue_plastic)
+//        .translate(path[n][0], path[n][1], path[n][2])
+//        .scale(.1);
+// }
+
+
+// SAMPLE A CATMULL ROM SPLINE PATH.
+
+// let P = [
+//    [-1, -1, -1],
+//    [-2/3, 1/3, 1],
+//    [ 1/3, -1/3, 1],
+//    [ 1, -1/3, 0],
+//    [-1,1,-1],
+//    [ 1,  1, -1],
+//    [-1, -1, -1],  // IF THE LAST KEY EQUALS THE FIRST, IT'S A LOOP.
+// ];
+
+let P = [
+  [0,1/3,0],
+  [0,5/6,-2/3],
+  [0,6/5,-3/2],
+  [0,1/5,-5/4],
+  [0,1/6,-2/3],
+  [0,-1,-2/3],
+  [0,-1/3,0], //bottom middle
+  [0,-1,2/3],
+  [0,1/6,2/3],
+  [0,1/5,5/4],
+  [0,6/5,3/2],
+  [0,5/6,2/3],
+  [0,1/3,0]
+];
+
+canvas1.onPress = (x, y) => {
+  //test.add(sphere, white_pearl).scale(.13).translate([Math.random()*6,y,x]);//z is anywhere between -1 and 1
+  for(let n = 0; n <= 30; n++){
+    let p = evalCRSpline([P[6],[-1, y, x],P[0]], n/30); //add new point between 3rd and 4th point on P with depth defaulted as -1
+    test.add(sphere, gold).translate(p).scale(.05);
+  }
+}
+
+for (let n = 0 ; n < P.length ; n++) // SHOW KEYS AS LARGE SPHERES.
+   test.add(sphere, white_pearl)
+       .translate(P[n])
+       .scale(.13);
+
+for (let n = 0 ; n <= 100 ; n++) {   // SHOW PATH AS SMALL SPHERES.
+   let p = evalCRSpline(P, n/100);
+   test.add(sphere, gold)
+       .translate(p)
+       .scale(.05);
+}
+
+
+
+// SAMPLE A CIRCULAR PATH, INCLUDING A CROSS VECTOR AT EACH SAMPLE.
+
+let createCircularPath = n => {
+   let path = [];
+   for (let i = 0 ; i <= n ; i++) {
+      let theta = 2 * Math.PI * i / n;
+      let c = Math.cos(theta);
+      let s = Math.sin(theta);
+      path.push([c,s,0, c,s,0]); // POSITION AND CROSS VECTOR
+   }
+   return path;
+}
+
+
+// CREATE A GOLD RING BY EXTRUDING A PROFILE ALONG A CIRCULAR PATH.
+
+// let createRingShape = function() {
+//    let a = .085, b = .04, c = .16,
+//        A  = .46, B = .6, C = .2;
+
+//    ringProfile = sampleBezierPath(
+//       [a,b,  0,0,0,  0,0,0,  b,a,c, c,a],
+//       [A,B,  B,A,C, -C,-A,-B,  -B,-A,-C, C,A],
+//       [0,0,0,0],
+//       20);
+//    return extrude(ringProfile, createCircularPath(50));
+// }
+
+// test.add(createRingShape(), white_gold).scale(1,1,.28).scale(1.3);
+
+
+// COMPUTE VIEW ROTATION ANGLES WHEN USER DRAGS MOUSE.
+
+let rotX=0, rotY=0, x0, y0;
+
+//canvas1.onPress = (x, y) => { x0 = x; y0 = y; }
+// canvas1.onDrag  = (x, y) => { 
+//   x0 = x;
+//   rotX += x - x0;
+//   y0 = y;
+//   rotY += y - y0;
+  
+// }
+
+
+                        
+//test.add(movingSphere(),white_gold).scale(.25);
+
+
+
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+
+</script>
+

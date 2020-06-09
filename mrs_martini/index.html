@@ -1,0 +1,269 @@
+<script src=lib6.js></script>
+
+<body bgcolor=teal text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+
+<br>
+<input type=range min=1 max=100 value=50 class=slider id=rateSlider>
+
+</center>
+</body>
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   attribute vec3 aNor;
+   attribute vec2 aUV;
+   uniform   mat4 uPMat;
+   uniform   mat4 uMatF;
+   uniform   mat4 uMatI;
+   varying   vec3 vaPos;
+   varying   vec3 vPos;
+   varying   vec3 vNor;
+   varying   vec2 vUV;
+   void main() {
+      vec4 pos = uPMat * uMatF * vec4(aPos, 1.);
+      vec4 nor = vec4(aNor, 0.) * uMatI;
+      gl_Position = pos * vec4(1.,1.,1./10.,1.);
+      vaPos = aPos;
+      vPos = pos.xyz;
+      vNor = nor.xyz;
+      vUV  = aUV;
+   }
+</script>
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ const int nl = 3;            // NUMBER OF LIGHTS
+ uniform vec3  uLDir[nl];     // LIGHT DIRECTIONS
+ uniform vec3  uLCol[nl];     // LIGHT COLORS
+ uniform mat4  uM;            // MATERIAL PROPERTIES
+ uniform float uTime;         // TIME (CURRENTLY UNUSED)
+ varying vec3  vPos;
+ varying vec3  vaPos;
+ varying vec3  vNor;
+ varying vec2  vUV;
+
+ void main() {
+    vec3 P = vPos;            // SURFACE POINT
+    vec3 N = normalize(vNor); // SURFACE NORMAL
+    vec3 E = vec3(0.,0.,1.);  // APPROX DIRECTION TO EYE
+
+    // UNPACK MATERIAL PROPERTIES MATRIX
+
+    mat4 material = uM;
+    vec3 ambient  = material[0].rgb;
+    vec3 diffuse  = material[1].rgb;
+    vec3 specular = material[2].rgb;
+    float p       = material[2].a;
+    float ta      = material[3].r;
+    float tf      = material[3].g;
+
+    // DO PHONG SHADING
+
+    vec3 color = ambient;
+    for (int i = 0 ; i < nl ; i++) {
+       vec3 R = 2. * dot(uLDir[i], N) * N - uLDir[i];
+       float d = max(0., dot(uLDir[i], N));
+       //float p2 = p * (1. + noise(vec3(10. * vUV, 0.)));
+       //float p2 = p * (1. + noise(10. * vaPos));
+       float s = pow(max(0., dot(E, R)), p);
+       color += uLCol[i] * (diffuse * d + specular * s);
+    }
+
+    color += specular *.02 * (.2 + 5. * noise(3. * N));
+    if (ta != 0.)
+       color *= 1. + ta * noise(vec3(tf * vUV, 0.));
+    gl_FragColor = vec4(sqrt(color), 1.0);
+ }</script>
+
+<!!-------- A PROPERLY DESCRIPTIVE TITLE -------->
+
+<script id='my_title' type='text/html'>
+MRS MARTINI
+</script>
+
+<!!-------- A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+<p>
+This summer is a sad summer. Watch this lonely martini glass struggling to catch olives to fix itself some drinks.
+</script>
+
+<script>
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+// USEFUL ANIMATION VARIABLES.
+
+let startTime = Date.now(), prevTime = startTime, rate = 1, theta = 0;
+
+// THIS METHOD GETS CALLED WHENEVER USER ADJUSTS THE SLIDER.
+
+rateSlider.oninput = function() {
+   rate = this.value / 50;
+}
+
+let gold          = phong([.1,.03,0], [.12,.05,0], [1,.5,0], 10);
+let red_plastic   = phong([.1,0,0], [.5,0,0], [1,1,1], 20, 1, 20);
+let green_plastic = phong([0,.1,0], [0,.5,0], [1,1,1], 20);
+
+let olive = phong([.2,.51,.2], [.1,.2,.3], [1,1,1], 20);
+
+let blue_plastic  = phong([0,.05,.1], [0,.25,.5], [1,1,1], 20);
+let white_plastic = phong([.1,.1,.1], [.5,.5,.5], [1,1,1], 20, 1, 20);
+let white_gold    = phong([.01,.01,.008], [0,0,0], [2,2,1.6], 40);
+let steel         = phong([.02,.02,.02], [.02,.02,.02], [1,1,1], 10);
+let brass         = phong([.02,.012,0], [.02,.012,0], [1,.6,0], 10);
+
+// DEFINE ANIMATION CALLBACK, WHICH WILL GET CALLED AT EVERY FRAME.
+
+let time = 0;
+
+function animate() {
+
+   // VARY THE ROTATION RATE DEPENDING ON THE SLIDER VALUE.
+
+   time = (Date.now() - startTime) / 1000;
+   theta += 2 * rate * (time - prevTime);
+   prevTime = time;
+
+   // SET TIME IN THE GPU.
+
+   setUniform('1f', 'uTime', time);
+
+   // SET LIGHTS IN THE GPU.
+
+   setUniform('3fv', 'uLDir', [ .57,.57,.57, -.57,-.57,-.57, -.8,-.6,0 ]);
+   setUniform('3fv', 'uLCol', [ 1,1,1,        .25,.2,.15,     .2,.18,.16 ]);
+
+   // SET PERPECTIVE MATRIX.
+
+   setUniform('Matrix4fv', 'uPMat', false, perspectiveMatrix);
+
+   // ANIMATE THE TEST OBJECT.
+
+   let s = Math.sin(5 * theta);
+   let c = Math.cos(5 * theta);
+   glass.identity().rotateZ(5).scale(.5).rotateY(s*.1).translate(0,0,1);
+   //water.identity().rotateX(theta*3).rotateY(4).translate(0,0,-2);
+bubble.identity().rotateX(theta*6).rotateX(2).translate(-.3,0,0);
+   // DRAW EVERYTHIN0
+
+   root.draw();
+}
+
+
+let perspectiveMatrix = createPerspectiveMatrix(3);
+let matrix = new Matrix();
+let root = new Object();
+let glass = root.add();
+let bubble = root.add();
+
+// CREATE A BRASS TACK AS A SURFACE OF REVOLUTION.
+
+let martiniGlass = createTriangleMesh(uvToLathe, 30, 30,
+   [
+      [1,.05, .05,.075,.5, .5,0], // r
+      [-1,-.7, 0,.85,.92, 1,1]     // z
+   ]
+);
+glass.add(martiniGlass, white_gold);
+glass.add(sphere,brass).scale(.2).translate(3,1,-3);
+glass.add(sphere,brass).scale(.2).translate(3,-1,-3);
+// SAMPLE A SPLINE PATH, PUT SMALL BLUE PLASTIC SPHERES ALONG THE PATH.
+
+let path = sampleBezierPath( [1/3,1/3, 2/3, -1/3],  // X keys
+                             [ -1/3,1/3, 1/3  ,-1/3],  // Y keys
+                             [ -1/3,1/3,  -1/3  , 1/3],  // Z keys
+           10);                // number of samples
+
+for (let n = Math.floor(path.length/2) ; n < path.length ; n++) {
+   bubble.add(sphere, olive)
+       .translate(path[n][0], path[n][1], path[n][2])
+       .scale(.1,.05,.03)
+       .translate(0,10,0);
+}
+
+
+// // SAMPLE A CIRCULAR PATH, INCLUDING A CROSS VECTOR AT EACH SAMPLE.
+
+let createCircularPath = n => {
+   let path = [];
+   for (let i = 0 ; i <= n ; i++) {
+      let theta = 2 * Math.PI * i / n;
+      let c = Math.cos(theta);
+      let s = Math.sin(theta);
+      path.push([c,s,0, c,s,0]); // POSITION AND CROSS VECTOR
+   }
+   return path;
+}
+
+
+// CREATE A GOLD RING BY EXTRUDING A PROFILE ALONG A CIRCULAR PATH.
+
+let createRingShape = function() {
+   let a = .085, b = .04, c = .16,
+       A  = .46, B = .6, C = .2;
+
+   ringProfile = sampleBezierPath(
+      [a,b,  0,0,0,  0,0,0,  b,a,c, c,a],
+      [A,B,  B,A,C, -C,-A,-B,  -B,-A,-C, C,A],
+      [0,0,0,0],
+      20);
+   return extrude(ringProfile, createCircularPath(50));
+}
+
+
+
+
+glass.add(createRingShape(), red_plastic).scale(.1).rotateY(2);
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+
+</script>
+
